@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rijeka Red AI - Pametni Redar</title>
+    <style>
+        :root { --primarna: #005bac; --akcent: #e63946; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 15px; display: flex; justify-content: center; }
+        .app-container { background: white; max-width: 500px; width: 100%; padding: 25px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .preview-box { width: 100%; height: 200px; border: 2px dashed #ccc; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 15px 0; background: #fafafa; }
+        .preview-box img { width: 100%; height: 100%; object-fit: cover; }
+        .ai-badge { background: #d1e7ff; color: #005bac; padding: 5px 12px; border-radius: 15px; font-size: 0.85em; font-weight: bold; display: none; }
+        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-main { background: var(--akcent); color: white; }
+        .btn-save { background: #eee; color: #333; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>🤖 Rijeka Red <span style="color:var(--akcent)">AI</span></h2>
+    
+    <!-- Sekcija za Korisnika (Spremljeni podaci) -->
+    <div id="user-section">
+        <input type="text" id="user_name" placeholder="Vaše Ime i Prezime (opcionalno)">
+        <input type="text" id="user_phone" placeholder="Vaš kontakt telefon">
+        <button class="btn btn-save" onclick="saveUserData()">Spremi moje podatke za ubuduće</button>
+    </div>
+
+    <hr>
+
+    <!-- Foto i AI -->
+    <label>📷 Fotografirajte ili učitajte sliku:</label>
+    <input type="file" id="imageInput" accept="image/*" onchange="processImage(event)">
+    <div class="preview-box" id="previewContainer">Učitajte sliku za AI analizu...</div>
+    <div id="aiBadge" class="ai-badge">AI detektirano: <span id="detectedType">-</span></div>
+
+    <label>📍 Lokacija (GPS):</label>
+    <input type="text" id="lokacija" placeholder="Dohvaćam koordinate...">
+
+    <label>📝 Opis (AI predložak):</label>
+    <textarea id="opis" rows="3"></textarea>
+
+    <button class="btn btn-main" onclick="posaljiSve()">POŠALJI PRIJAVU</button>
+</div>
+
+<script>
+// 1. Memorija podataka prijavitelja
+window.onload = () => {
+    document.getElementById('user_name').value = localStorage.getItem('ri_name') || "";
+    document.getElementById('user_phone').value = localStorage.getItem('ri_phone') || "";
+    dohvatiGPS();
+};
+
+function saveUserData() {
+    localStorage.setItem('ri_name', document.getElementById('user_name').value);
+    localStorage.setItem('ri_phone', document.getElementById('user_phone').value);
+    alert("Podaci spremljeni!");
+}
+
+// 2. Simulacija AI prepoznavanja (za punu verziju bi se dodao model.json)
+function processImage(event) {
+    const reader = new FileReader();
+    reader.onload = function() {
+        const output = document.getElementById('previewContainer');
+        output.innerHTML = `<img src="${reader.result}" id="activeImage">`;
+        
+        // Simulacija AI logike za "crne mrlje" i "fasade"
+        document.getElementById('aiBadge').style.display = 'inline-block';
+        const tip = "Vlaga/Plijesan (Fasada)"; // Ovdje AI inače vraća rezultat
+        document.getElementById('detectedType').innerText = tip;
+        document.getElementById('opis').value = `Automatska detekcija: ${tip}. Na slici su vidljiva oštećenja koja zahtijevaju intervenciju.`;
+    };
+    reader.readAsDataURL(event.target.files[0]);
+}
+
+// 3. GPS i Slanje (ostaje isto kao prije)
+function dohvatiGPS() {
+    navigator.geolocation.getCurrentPosition(p => {
+        document.getElementById('lokacija').value = `${p.coords.latitude}, ${p.coords.longitude}`;
+    });
+}
+
+function posaljiSve() {
+    const ime = document.getElementById('user_name').value || "Građanin";
+    const tel = document.getElementById('user_phone').value || "/";
+    const body = `Prijavitelj: ${ime}\nKontakt: ${tel}\nLokacija: ${document.getElementById('lokacija').value}\n\nProblem:\n${document.getElementById('opis').value}`;
+    
+    window.location.href = `mailto:komunalno.redarstvo@rijeka.hr?subject=Prijava&body=${encodeURIComponent(body)}`;
+}
+</script>
+
+</body>
+</html>
