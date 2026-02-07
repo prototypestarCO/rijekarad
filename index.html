@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rijeka Red AI - Pametni Redar</title>
     
-    <!-- TensorFlow.js za stvarnu AI analizu -->
+    <!-- 1. First load core TensorFlow -->
     <script src="https://cdn.jsdelivr.net"></script>
+    <!-- 2. Then load MobileNet -->
     <script src="https://cdn.jsdelivr.net"></script>
 
     <style>
@@ -14,7 +15,6 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 15px; display: flex; justify-content: center; }
         .app-container { background: white; max-width: 500px; width: 100%; padding: 25px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
         
-        /* Box za prikaz slike/kamere */
         .preview-box { 
             width: 100%; min-height: 250px; border: 2px dashed #ccc; border-radius: 10px; 
             display: flex; align-items: center; justify-content: center; overflow: hidden; 
@@ -37,7 +37,6 @@
 <div class="app-container">
     <h2>🤖 Rijeka Red <span style="color:var(--akcent)">AI</span></h2>
     
-    <!-- Podaci o korisniku -->
     <div id="user-section">
         <input type="text" id="user_name" placeholder="Vaše Ime i Prezime">
         <input type="text" id="user_phone" placeholder="Vaš kontakt telefon">
@@ -46,7 +45,6 @@
 
     <hr style="margin: 20px 0;">
 
-    <!-- Odabir unosa slike -->
     <label>📷 Korak 1: Fotografirajte ili učitajte:</label>
     <div class="btn-group">
         <button class="btn btn-save" onclick="document.getElementById('imageInput').click()" style="flex:1;">IZ GALERIJE</button>
@@ -55,9 +53,8 @@
     
     <input type="file" id="imageInput" accept="image/*" onchange="processFile(event)" style="display:none;">
 
-    <!-- Prozor za prikaz -->
     <div class="preview-box" id="previewContainer">
-        <span id="placeholderText">Čekam unos...</span>
+        <span id="placeholderText">Učitavam AI model...</span>
         <video id="video" autoplay playsinline style="display:none;"></video>
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="imagePreview" style="display:none;">
@@ -65,7 +62,6 @@
 
     <button class="btn btn-camera" id="captureBtn" style="display:none; background:#e9c46a; color:black;" onclick="uslikaj()">USLIKAJ ZA ANALIZU</button>
 
-    <!-- Rezultat AI -->
     <div id="aiBadge" class="ai-badge">🔍 AI DETEKCIJA: <span id="detectedType">-</span></div>
 
     <label>📍 Korak 2: Provjera lokacije:</label>
@@ -84,15 +80,19 @@ const canvas = document.getElementById('canvas');
 const imgPreview = document.getElementById('imagePreview');
 const placeholder = document.getElementById('placeholderText');
 
-// 1. Učitaj AI model pri startu
+// Initialize AI
 async function loadAI() {
-    console.log("Učitavam AI...");
-    model = await mobilenet.load();
-    console.log("AI spreman!");
+    try {
+        model = await mobilenet.load();
+        placeholder.innerText = "Spremno! Odaberite sliku.";
+        console.log("AI Model Loaded Successfully");
+    } catch (e) {
+        placeholder.innerText = "Greška pri učitavanju AI modela.";
+        console.error(e);
+    }
 }
 loadAI();
 
-// 2. Memorija korisnika i GPS
 window.onload = () => {
     document.getElementById('user_name').value = localStorage.getItem('ri_name') || "";
     document.getElementById('user_phone').value = localStorage.getItem('ri_phone') || "";
@@ -102,16 +102,15 @@ window.onload = () => {
 function saveUserData() {
     localStorage.setItem('ri_name', document.getElementById('user_name').value);
     localStorage.setItem('ri_phone', document.getElementById('user_phone').value);
-    alert("Podaci su spremljeni na ovom uređaju!");
+    alert("Podaci spremljeni!");
 }
 
 function dohvatiGPS() {
     navigator.geolocation.getCurrentPosition(p => {
         document.getElementById('lokacija').value = `${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`;
-    }, () => { document.getElementById('lokacija').value = "GPS nedostupan"; });
+    }, () => { document.getElementById('lokacija').value = "GPS nedostupan (uključite lokaciju)"; });
 }
 
-// 3. Logika za KAMERU
 async function pokreniKameru() {
     resetPrikaza();
     try {
@@ -121,7 +120,7 @@ async function pokreniKameru() {
         placeholder.style.display = 'none';
         document.getElementById('captureBtn').style.display = 'block';
     } catch (err) {
-        alert("Pristup kameri odbijen ili nije dostupan.");
+        alert("Kamera nije dostupna. Provjerite dopuštenja.");
     }
 }
 
@@ -131,7 +130,6 @@ async function uslikaj() {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    // Ugasi video, prikaži canvas (sliku)
     video.srcObject.getTracks().forEach(track => track.stop());
     video.style.display = 'none';
     canvas.style.display = 'block';
@@ -140,43 +138,42 @@ async function uslikaj() {
     analizirajSliku(canvas);
 }
 
-// 4. Logika za GALERIJU (Učitavanje file-a)
 function processFile(event) {
+    if (!event.target.files[0]) return;
     resetPrikaza();
     const reader = new FileReader();
     reader.onload = function() {
         imgPreview.src = reader.result;
         imgPreview.style.display = 'block';
         placeholder.style.display = 'none';
-        
-        // Čekamo da se slika učita u <img> element prije analize
         imgPreview.onload = () => analizirajSliku(imgPreview);
     };
     reader.readAsDataURL(event.target.files[0]);
 }
 
-// 5. STVARNA ANALIZA (Zajednička funkcija)
 async function analizirajSliku(izvor) {
     const badge = document.getElementById('aiBadge');
     const typeSpan = document.getElementById('detectedType');
     badge.style.display = 'block';
-    typeSpan.innerText = "Razmišljam...";
+    typeSpan.innerText = "Analiziram...";
 
     if (!model) {
-        typeSpan.innerText = "Model se još učitava, pričekajte...";
+        alert("AI model se još učitava, molimo pričekajte par sekundi.");
         return;
     }
     
-    // Analiza izvora (slike ili canvasa)
     const predictions = await model.classify(izvor);
     const topResult = predictions[0].className;
-    const vjerojatnost = Math.round(predictions[0].probability * 100);
+    const probability = Math.round(predictions[0].probability * 100);
     
-    typeSpan.innerText = `${topResult} (${vjerojatnost}%)`;
-    document.getElementById('opis').value = `Prijava putem AI redara.\nDetektirano: ${topResult}.\nLokacija zahtijeva provjeru zbog mogućeg komunalnog nereda.`;
+    typeSpan.innerText = `${topResult} (${probability}%)`;
+    document.getElementById('opis').value = `Prijava komunalnog nereda.\nDetektirano: ${topResult}.\nPotrebna provjera lokacije.`;
 }
 
 function resetPrikaza() {
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
     video.style.display = 'none';
     canvas.style.display = 'none';
     imgPreview.style.display = 'none';
@@ -185,7 +182,6 @@ function resetPrikaza() {
     document.getElementById('aiBadge').style.display = 'none';
 }
 
-// 6. Slanje (Mailto)
 function posaljiSve() {
     const ime = document.getElementById('user_name').value || "Građanin";
     const tel = document.getElementById('user_phone').value || "/";
