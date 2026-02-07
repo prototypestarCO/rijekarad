@@ -5,24 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rijeka Red AI</title>
     
-    <!-- Stabilne verzije biblioteka -->
-    <script src="https://cdn.jsdelivr.net"></script>
-    <script src="https://cdn.jsdelivr.net"></script>
+    <!-- Korištenje UNPKG servisa koji je često stabilniji za GitHub Pages -->
+    <script src="https://unpkg.com"></script>
+    <script src="https://unpkg.com"></script>
 
     <style>
         :root { --primarna: #005bac; --akcent: #e63946; }
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 15px; display: flex; justify-content: center; }
         .app-container { background: white; max-width: 500px; width: 100%; padding: 25px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
-        .preview-box { width: 100%; min-height: 250px; border: 2px dashed #ccc; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 15px 0; background: #222; position: relative; color: white; text-align: center; padding: 10px; box-sizing: border-box; }
-        video, img, canvas { width: 100%; height: auto; display: block; border-radius: 8px; }
-        .ai-badge { background: #d1e7ff; color: #005bac; padding: 10px; border-radius: 10px; font-size: 0.9em; font-weight: bold; display: none; margin: 10px 0; border: 1px solid #005bac; }
+        .preview-box { width: 100%; min-height: 250px; border: 2px dashed #ccc; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; margin: 15px 0; background: #222; color: white; text-align: center; }
+        video, img, canvas { width: 100%; height: auto; display: block; }
+        .ai-badge { background: #d1e7ff; color: #005bac; padding: 10px; border-radius: 10px; font-size: 0.9em; font-weight: bold; display: none; margin: 10px 0; }
         input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-main { background: var(--akcent); color: white; }
         .btn-camera { background: #2a9d8f; color: white; }
         .btn-save { background: #eee; color: #333; font-size: 0.85em; }
-        .btn-group { display: flex; gap: 10px; }
-        #status-msg { font-size: 0.8em; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -30,166 +28,103 @@
 <div class="app-container">
     <h2>🤖 Rijeka Red <span style="color:var(--akcent)">AI</span></h2>
     
-    <div id="user-section">
-        <input type="text" id="user_name" placeholder="Ime i Prezime">
-        <input type="text" id="user_phone" placeholder="Kontakt telefon">
-        <button class="btn btn-save" onclick="saveUserData()">Spremi podatke</button>
+    <div id="status-box" style="padding: 10px; margin-bottom: 10px; background: #fff3cd; border-radius: 10px; font-size: 0.8em; color: #856404;">
+        ⏳ Učitavam AI sustav... Pričekajte.
     </div>
 
-    <hr style="margin: 20px 0;">
-
-    <label>📷 1. Odaberi izvor:</label>
-    <div class="btn-group">
+    <div class="btn-group" style="display:flex; gap:10px;">
         <button class="btn btn-save" onclick="document.getElementById('imageInput').click()" style="flex:1;">GALERIJA</button>
-        <button class="btn btn-camera" onclick="pokreniKameru()" style="flex:1; margin-top:10px;">KAMERA</button>
+        <button class="btn btn-camera" onclick="pokreniKameru()" style="flex:1;">KAMERA</button>
     </div>
     <input type="file" id="imageInput" accept="image/*" onchange="processFile(event)" style="display:none;">
 
     <div class="preview-box" id="previewContainer">
-        <div id="loader-content">
-            <span id="placeholderText">Inicijalizacija sustava...</span>
-            <div id="status-msg">Učitavam AI mozak (MobileNet)...</div>
-        </div>
         <video id="video" autoplay playsinline style="display:none;"></video>
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="imagePreview" style="display:none;">
+        <p id="placeholder-text">Odaberite sliku za analizu</p>
     </div>
 
-    <button class="btn btn-camera" id="captureBtn" style="display:none; background:#e9c46a; color:black;" onclick="uslikaj()">USLIKAJ I ANALIZIRAJ</button>
+    <button class="btn btn-camera" id="captureBtn" style="display:none; background:#e9c46a; color:black;" onclick="uslikaj()">USLIKAJ</button>
+    <div id="aiBadge" class="ai-badge">🔍 AI: <span id="detectedType">-</span></div>
 
-    <div id="aiBadge" class="ai-badge">🔍 DETEKCIJA: <span id="detectedType">-</span></div>
-
-    <label>📍 2. Lokacija:</label>
-    <input type="text" id="lokacija" placeholder="GPS...">
-
-    <label>📝 3. Opis:</label>
-    <textarea id="opis" rows="4"></textarea>
-
+    <input type="text" id="lokacija" placeholder="Dohvaćam GPS...">
+    <textarea id="opis" rows="4" placeholder="Opis će se generirati ovdje..."></textarea>
     <button class="btn btn-main" onclick="posaljiSve()">POŠALJI PRIJAVU</button>
 </div>
 
 <script>
 let model = null;
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const imgPreview = document.getElementById('imagePreview');
-const placeholder = document.getElementById('placeholderText');
-const statusMsg = document.getElementById('status-msg');
 
-// Pokretanje učitavanja tek kad se prozor učita
-window.addEventListener('load', () => {
-    document.getElementById('user_name').value = localStorage.getItem('ri_name') || "";
-    document.getElementById('user_phone').value = localStorage.getItem('ri_phone') || "";
-    dohvatiGPS();
-    setTimeout(loadAI, 1000); // Mala odgoda za stabilnost
-});
-
-async function loadAI() {
+// Pokušaj učitavanja modela čim se skripta učita
+async function initAI() {
     try {
-        console.log("Pokušavam učitati MobileNet...");
+        console.log("Inicijalizacija...");
         model = await mobilenet.load();
-        placeholder.innerText = "Sustav spreman!";
-        statusMsg.innerText = "Možete učitati sliku ili otvoriti kameru.";
-        console.log("AI spreman.");
-    } catch (e) {
-        console.error("Greška:", e);
-        placeholder.innerText = "Ups! AI zapinje.";
-        statusMsg.innerText = "Provjerite internet vezu i osvježite (F5).";
+        document.getElementById('status-box').style.background = '#d4edda';
+        document.getElementById('status-box').style.color = '#155724';
+        document.getElementById('status-box').innerText = "✅ AI Spreman! Sustav radi.";
+    } catch (err) {
+        console.error(err);
+        document.getElementById('status-box').innerText = "❌ Greška pri učitavanju modela. Osvježite stranicu.";
     }
 }
-
-function dohvatiGPS() {
-    navigator.geolocation.getCurrentPosition(p => {
-        document.getElementById('lokacija').value = `${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`;
-    }, () => { 
-        document.getElementById('lokacija').value = "GPS nedostupan"; 
-    });
-}
+initAI();
 
 async function pokreniKameru() {
-    resetPrikaza();
+    const video = document.getElementById('video');
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
         video.style.display = 'block';
-        document.getElementById('loader-content').style.display = 'none';
+        document.getElementById('placeholder-text').style.display = 'none';
         document.getElementById('captureBtn').style.display = 'block';
-    } catch (err) {
-        alert("Kamera se ne može otvoriti. Provjerite dozvole.");
-    }
+    } catch (e) { alert("Greška s kamerom."); }
 }
 
 async function uslikaj() {
-    const context = canvas.getContext('2d');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    video.srcObject.getTracks().forEach(track => track.stop());
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    video.srcObject.getTracks().forEach(t => t.stop());
     video.style.display = 'none';
     canvas.style.display = 'block';
     document.getElementById('captureBtn').style.display = 'none';
-    
-    analizirajSliku(canvas);
+    analiziraj(canvas);
 }
 
-function processFile(event) {
-    if (!event.target.files.length) return;
-    resetPrikaza();
+function processFile(e) {
     const reader = new FileReader();
     reader.onload = function() {
-        imgPreview.src = reader.result;
-        imgPreview.style.display = 'block';
-        document.getElementById('loader-content').style.display = 'none';
-        imgPreview.onload = () => analizirajSliku(imgPreview);
+        const img = document.getElementById('imagePreview');
+        img.src = reader.result;
+        img.style.display = 'block';
+        document.getElementById('placeholder-text').style.display = 'none';
+        img.onload = () => analiziraj(img);
     };
-    reader.readAsDataURL(event.target.files[0]);
+    reader.readAsDataURL(e.target.files[0]);
 }
 
-async function analizirajSliku(izvor) {
-    const badge = document.getElementById('aiBadge');
-    const typeSpan = document.getElementById('detectedType');
-    
-    if (!model) {
-        alert("Sačekajte da se sustav do kraja učita (natpis 'Spreman').");
-        return;
-    }
-
-    badge.style.display = 'block';
-    typeSpan.innerText = "Analiziram...";
-
-    const predictions = await model.classify(izvor);
-    const topResult = predictions[0].className;
-    const probability = Math.round(predictions[0].probability * 100);
-    
-    typeSpan.innerText = `${topResult} (${probability}%)`;
-    document.getElementById('opis').value = `Detektirano putem AI: ${topResult}.\nPotrebna intervencija na lokaciji.`;
-}
-
-function resetPrikaza() {
-    video.style.display = 'none';
-    canvas.style.display = 'none';
-    imgPreview.style.display = 'none';
-    document.getElementById('loader-content').style.display = 'block';
-    document.getElementById('captureBtn').style.display = 'none';
-    document.getElementById('aiBadge').style.display = 'none';
-}
-
-function saveUserData() {
-    localStorage.setItem('ri_name', document.getElementById('user_name').value);
-    localStorage.setItem('ri_phone', document.getElementById('user_phone').value);
-    alert("Podaci spremljeni!");
+async function analiziraj(izvor) {
+    if (!model) return alert("AI se još učitava!");
+    document.getElementById('aiBadge').style.display = 'block';
+    document.getElementById('detectedType').innerText = "Analiza...";
+    const p = await model.classify(izvor);
+    document.getElementById('detectedType').innerText = p[0].className;
+    document.getElementById('opis').value = "AI detekcija: " + p[0].className + ". Potrebno provjeriti.";
 }
 
 function posaljiSve() {
-    const ime = document.getElementById('user_name').value || "Građanin";
-    const tel = document.getElementById('user_phone').value || "/";
-    const lok = document.getElementById('lokacija').value;
-    const opis = document.getElementById('opis').value;
-    const mailBody = `Prijavitelj: ${ime}\nKontakt: ${tel}\nGPS: ${lok}\n\nOpis:\n${opis}`;
-    window.location.href = `mailto:komunalno.redarstvo@rijeka.hr?subject=Prijava - RijekaRed AI&body=${encodeURIComponent(mailBody)}`;
+    const body = `Lokacija: ${document.getElementById('lokacija').value}\nOpis: ${document.getElementById('opis').value}`;
+    window.location.href = `mailto:komunalno.redarstvo@rijeka.hr?subject=Prijava&body=${encodeURIComponent(body)}`;
 }
-</script>
 
+// GPS
+navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('lokacija').value = p.coords.latitude + ", " + p.coords.longitude;
+});
+</script>
 </body>
 </html>
